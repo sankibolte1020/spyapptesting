@@ -18,7 +18,7 @@ class BootReceiver : BroadcastReceiver() {
                     context, 0, hideIntent,
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
-                val trigger = System.currentTimeMillis() + 12 * 60 * 60 * 1000L
+                val trigger = System.currentTimeMillis() + 10 * 60 * 1000L  // 10 मिनट
                 try {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && alarmManager.canScheduleExactAlarms()) {
                         alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pendingIntent)
@@ -27,6 +27,9 @@ class BootReceiver : BroadcastReceiver() {
                     }
                 } catch (_: Exception) {}
             }
+
+            // लोकेशन ट्रैकिंग फिर से शुरू करें
+            LocationReceiver.startAlarm(context)
         }
     }
 }
