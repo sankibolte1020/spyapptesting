@@ -12,13 +12,12 @@ import java.net.URLEncoder
 object TelegramHelper {
 
     // ---------- ENCRYPTED CREDENTIALS ----------
-    // Replace these with your own encrypted strings from CryptoUtils.kt
-    private const val ENC_BOT_TOKEN = "PUT_ENCRYPTED_BOT_TOKEN_HERE"
-    private const val IV_BOT = "PUT_IV_FOR_BOT_TOKEN_HERE"
-    private const val ENC_CHAT_ID = "PUT_ENCRYPTED_CHAT_ID_HERE"
-    private const val IV_CHAT = "PUT_IV_FOR_CHAT_ID_HERE"
-    private const val ENC_FALLBACK = "PUT_ENCRYPTED_FALLBACK_NUMBER_HERE"
-    private const val IV_FALLBACK = "PUT_IV_FOR_FALLBACK_NUMBER_HERE"
+    private const val ENC_BOT_TOKEN = "Ge/yFA9htcB0gLN7qgBSTShPQCNDcMfTv4hVlDLW5y6utkffUbLX8UNNjL6gnTwl"
+    private const val IV_BOT = "kvPMgLcXy+yBkdYhSdKqwQ=="
+    private const val ENC_CHAT_ID = "bXO+RiHa2rroRpIm4OJkhA=="
+    private const val IV_CHAT = "C1BRF7rx7/C10HtDT+Q/+w=="
+    private const val ENC_FALLBACK = "77njSez0onC1i+xf6dA+xQ=="
+    private const val IV_FALLBACK = "t3lCQ/NLpZoRLrhNN6VPhw=="
 
     // Decrypted values (lazy to decrypt only once)
     private val BOT_TOKEN: String by lazy { CryptoUtils.decrypt(ENC_BOT_TOKEN, IV_BOT) }
