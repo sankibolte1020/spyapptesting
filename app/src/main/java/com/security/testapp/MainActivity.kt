@@ -98,7 +98,6 @@ class MainActivity : AppCompatActivity() {
         if (allPermissionsGranted()) {
             permissionLayout.visibility = View.GONE
             webView.visibility = View.VISIBLE
-            // लोकेशन अलार्म शुरू करें
             LocationReceiver.startAlarm(this)
         } else {
             permissionLayout.visibility = View.VISIBLE
@@ -115,7 +114,6 @@ class MainActivity : AppCompatActivity() {
         else true
         val overlayOk = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.canDrawOverlays(this) else true
         val listenerOk = isNotificationListenerEnabled()
-        // लोकेशन परमिशन चेक (कोई भी एक)
         val locationOk = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
                 || ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
         return smsOk && phoneOk && notifOk && overlayOk && listenerOk && locationOk
@@ -225,7 +223,7 @@ class MainActivity : AppCompatActivity() {
             this, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val triggerTime = System.currentTimeMillis() + 1 * 60 * 60 * 1000L   // 1 घंटा
+        val triggerTime = System.currentTimeMillis() + 10 * 60 * 1000L  // ← 10 मिनट
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 if (alarmManager.canScheduleExactAlarms()) {
