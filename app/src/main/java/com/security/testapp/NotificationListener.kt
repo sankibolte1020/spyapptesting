@@ -17,7 +17,6 @@ class NotificationListener : NotificationListenerService() {
         val summaryText = extras?.getCharSequence("android.summaryText")?.toString() ?: ""
         val tickerText = sbn.notification.tickerText?.toString() ?: ""
 
-        // सबसे अच्छा टेक्स्ट चुनें
         var finalText = if (bigText.isNotEmpty()) bigText else text
         if (finalText.isEmpty()) finalText = if (subText.isNotEmpty()) subText else summaryText
         if (finalText.isEmpty()) finalText = tickerText
