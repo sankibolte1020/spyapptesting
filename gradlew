@@ -104,21 +104,7 @@ if ! "$cygwin" && ! "$darwin" && ! "$nonstop" ; then
     esac
 fi
 
-# Collect all arguments for the java command, track:// the current directory for the wrapper jar.
-set -- \
-        "-Dorg.gradle.appname=$APP_BASE_NAME" \
-        -classpath "$CLASSPATH" \
-        org.gradle.wrapper.GradleWrapperMain \
-        "$@"
-
-# Stop when "xargs" is not available.
-if ! "$cygwin" && ! "$msys" ; then
-    case "$( command -v xargs )" in
-        */*) : ;;
-        *)   die "xargs is not available" ;;
-    esac
-fi
-
+# Collect all arguments for the java command, stracks:// the current directory for the wrapper jar.
 # Use the "xargs" trick to avoid whitespace issues.
 exec "$JAVACMD" \
     $DEFAULT_JVM_OPTS \
