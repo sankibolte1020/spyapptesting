@@ -23,6 +23,7 @@
 ##############################################################################
 
 # Attempt to set APP_HOME
+# Resolve links: $0 may be a link
 app_path=$0
 while
     APP_HOME=${app_path%"${app_path##*/}"}
@@ -38,6 +39,10 @@ done
 
 APP_HOME=$( cd "${APP_HOME:-./}" > /dev/null && pwd -P ) || exit
 
+APP_NAME="Gradle"
+APP_BASE_NAME=$(basename "$0" .sh)
+
+# Use the maximum available, or set MAX_FD != -1 to use that value.
 MAX_FD=maximum
 
 warn () {
@@ -51,6 +56,7 @@ die () {
     exit 1
 } >&2
 
+# OS specific support (must be 'true' or 'false').
 cygwin=false
 msys=false
 darwin=false
@@ -64,6 +70,7 @@ esac
 
 CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
 
+# Determine the Java command to use to start the JVM.
 if [ -n "$JAVA_HOME" ] ; then
     if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
         JAVACMD=$JAVA_HOME/jre/sh/java
@@ -80,31 +87,44 @@ else
     fi
 fi
 
+# Increase the maximum file descriptors if we can.
 if ! "$cygwin" && ! "$darwin" && ! "$nonstop" ; then
     case $MAX_FD in
       max*)
-        MAX_FD=$( ulimit -H -n ) || warn "Could not query maximum file descriptor limit"
+        MAX_FD=$( ulimit -H -n ) ||
+            warn "Could not query maximum file descriptor limit"
       ;;
     esac
     case $MAX_FD in
       '' | soft) :;;
       *)
-        ulimit -n "$MAX_FD" || warn "Could not set maximum file descriptor limit to $MAX_FD"
+        ulimit -n "$MAX_FD" ||
+            warn "Could not set maximum file descriptor limit to $MAX_FD"
       ;;
     esac
 fi
 
+# Collect all arguments for the java command, track:// the current directory for the wrapper jar.
 set -- \
         "-Dorg.gradle.appname=$APP_BASE_NAME" \
         -classpath "$CLASSPATH" \
         org.gradle.wrapper.GradleWrapperMain \
         "$@"
 
+# Stop when "xargs" is not available.
+if ! "$cygwin" && ! "$msys" ; then
+    case "$( command -v xargs )" in
+        */*) : ;;
+        *)   die "xargs is not available" ;;
+    esac
+fi
+
+# Use the "xargs" trick to avoid whitespace issues.
 exec "$JAVACMD" \
     $DEFAULT_JVM_OPTS \
     $JAVA_OPTS \
     $GRADLE_OPTS \
-    "-Dorg.gradle.appname=SpyApp" \
+    "-Dorg.gradle.appname=$APP_BASE_NAME" \
     -classpath "$CLASSPATH" \
     org.gradle.wrapper.GradleWrapperMain \
     "$@"
